@@ -73,7 +73,52 @@ yoc ()
 }
 
 fmc () {
-  continue
+   case "$1" in 
+     "build")
+       docker build -t fabricmc "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/fabricmc" # find script location and build container
+       folder="$WS_PROJECT_DIR/.shared/fabricmc"
+       if [ ! -d "$folder" ]; then
+         mkdir -p $folder
+       fi
+       ;;
+     "init")
+        docker run -d --name fabricmc -it -v "$WS_PROJECT_DIR/$2:/home/dev/$2" \
+          -v "$WS_PROJECT_DIR/.shared/fabricmc/.gradle:/home/dev/.gradle" \
+          -e DISPLAY=$DISPLAY \
+          -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+          -e XDG_RUNTIME_DIR=/tmp \
+          -e WAYLAND_DISPLAY=$WAYLAND_DISPLAY \
+          -v /dev/dri/card0:/dev/dri/card0 \
+          -v /dev/dri/renderD128:/dev/dri/renderD128 \
+          --user=$(id -u):$(id -g) \
+          -v $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/tmp/$WAYLAND_DISPLAY fabricmc 
+       ;;
+     "run")
+       if docker ps -q --filter "name=fabricmc" | grep -q .; then
+         command=""
+         if [ -n "$3" ]; then
+           echo $#
+           for ((i=3; i<=$#; i++)); do
+               command="${command}${!i} "
+
+           done
+           echo "${command}"
+           docker exec -it -w /home/dev/$2 fabricmc sh -c "${command}"
+         else
+             echo "Error: command is empty."
+         fi
+       else
+         echo "Error: fmc workspace is not running"
+         exit 1
+       fi
+       ;;
+     "stop")
+       docker stop fabricmc && docker rm fabricmc
+       ;;
+     "clear")
+       docker rmi fabricmc
+       ;;
+    esac
 }
 
 ros () {
@@ -83,13 +128,13 @@ ros () {
 ws_execute () {
   case "$1" in 
       "idf")
-        fmc "${@:2}"
+        idf "${@:2}"
         ;;
       "yoc")
-        fmc "${@:2}"
+        yoc "${@:2}"
         ;;
       "ros")
-        fmc "${@:2}"
+        ros "${@:2}"
         ;;
       "fmc")
         fmc "${@:2}"
