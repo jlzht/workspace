@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-# TODO: add user feedback for what is happening in background
+# TODO:
+# - add user feedback for what is happening in background
+# - unify workspaces execute functions
+# - try using vnc servers
 
 check_env_var() {
     if [ -n "$WS_PROJECT_DIR" ]; then
@@ -97,10 +100,8 @@ fmc () {
        if docker ps -q --filter "name=fabricmc" | grep -q .; then
          command=""
          if [ -n "$3" ]; then
-           echo $#
            for ((i=3; i<=$#; i++)); do
                command="${command}${!i} "
-
            done
            echo "${command}"
            docker exec -it -w /home/dev/$2 fabricmc sh -c "${command}"
@@ -122,7 +123,49 @@ fmc () {
 }
 
 ros () {
-  continue
+   case "$1" in
+     "build")
+       docker build -t ros "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/ros"
+       folder="$WS_PROJECT_DIR/.shared/ros"
+       if [ ! -d "$folder" ]; then
+         mkdir -p $folder
+       fi
+       ;;
+     "init")
+        docker run -d --name ros -it -v "$WS_PROJECT_DIR/$2:/home/dev/$2" \
+          -e DISPLAY=$DISPLAY \
+          -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+          -e XDG_RUNTIME_DIR=/tmp \
+          -e WAYLAND_DISPLAY=$WAYLAND_DISPLAY \
+          -v /dev/dri/card0:/dev/dri/card0 \
+          -v /dev/dri/renderD128:/dev/dri/renderD128 \
+          --user=$(id -u):$(id -g) \
+          -v $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/tmp/$WAYLAND_DISPLAY ros
+       ;;
+     "run")
+       if docker ps -q --filter "name=ros" | grep -q .; then
+         command=""
+         if [ -n "$3" ]; then
+           for ((i=3; i<=$#; i++)); do
+               command="${command}${!i} "
+           done
+           echo "${command}"
+           docker exec -it -w /home/dev/$2 ros sh -c "${command}"
+         else
+             echo "Error: command is empty."
+         fi
+       else
+         echo "Error: ros workspace is not running"
+         exit 1
+       fi
+       ;;
+     "stop")
+       docker stop ros && docker rm ros
+       ;;
+     "clear")
+       docker rmi ros
+       ;;
+    esac
 }
 
 ws_execute () {
@@ -155,4 +198,3 @@ ws_execute "$@"
 
 #IDEAS:
 # - add run commands and workspaces using json [using jq]
-# - 
