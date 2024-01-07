@@ -20,7 +20,7 @@ check_workspace() {
             continue
             ;;
         *)
-          if [ -n "$1" ]; then
+          if ! [ -n "$1" ]; then
             echo "Error: invalid workspace selected: none"
             exit 1
           fi
@@ -72,7 +72,44 @@ idf ()
 
 yoc ()
 {
-  continue
+   case "$1" in 
+     "build")
+       docker build -t yocto "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/yocto"
+       folder="$WS_PROJECT_DIR/.shared/yocto"
+       if [ ! -d "$folder" ]; then
+         mkdir -p $folder
+       fi
+       ;;
+     "init")
+        docker run -d --name yocto -it  \
+          -v "$WS_PROJECT_DIR/.shared/yocto/poky:/home/dev/poky" \
+          -v "$WS_PROJECT_DIR/$2:/home/dev/poky/$2" \
+          --user=$(id -u):$(id -g) yocto
+       ;;
+     "run")
+       if docker ps -q --filter "name=yocto" | grep -q .; then
+         command=""
+         if [ -n "$3" ]; then
+           for ((i=3; i<=$#; i++)); do
+               command="${command}${!i} "
+           done
+           echo "${command}"
+           docker exec -it -w /home/dev/poky/$2 yocto sh -c "${command}"
+         else
+             echo "Error: command is empty."
+         fi
+       else
+         echo "Error: fmc workspace is not running"
+         exit 1
+       fi
+       ;;
+     "stop")
+       docker stop yocto && docker rm yocto
+       ;;
+     "clear")
+       docker rmi yocto
+       ;;
+  esac 
 }
 
 fmc () {
