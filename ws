@@ -4,6 +4,7 @@
 # - add user feedback for what is happening in background
 # - unify workspaces execute functions
 # - try using vnc servers
+# - create missing shared dirs (sharing a volume with a missing dirs, creates dir with root ownership)
 
 check_env_var() {
     if [ -n "$WS_PROJECT_DIR" ]; then
@@ -67,7 +68,46 @@ check_project ()
 
 idf ()
 {
-  continue
+    case "$1" in
+     "build")
+       docker build -t idf "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/espidf"
+       folder="$WS_PROJECT_DIR/.shared/idf"
+       if [ ! -d "$folder" ]; then
+         mkdir -p $folder
+       fi
+       ;;
+     "init")
+        docker run -d --name idf -it \
+          -v "$WS_PROJECT_DIR/.shared/idf/.espressif:/home/dev/.espressif/" \
+          -v "$WS_PROJECT_DIR/.shared/idf/esp-idf:/home/dev/esp-idf/" \
+          -v "/dev:/dev" --device-cgroup-rule='c 188:* rmw' \ # used for acessing USB devices
+          -v "$WS_PROJECT_DIR/$2:/home/dev/$2" \
+          --user=$(id -u):$(id -g) idf
+       ;;
+     "run")
+       if docker ps -q --filter "name=idf" | grep -q .; then
+         command=""
+         if [ -n "$3" ]; then
+           for ((i=3; i<=$#; i++)); do
+               command="${command}${!i} "
+           done
+           echo "${command}"
+           docker exec -it -w /home/dev/$2 idf sh -c "${command}"
+         else
+             echo "Error: command is empty."
+         fi
+       else
+         echo "Error: fmc workspace is not running"
+         exit 1
+       fi
+       ;;
+     "stop")
+       docker stop idf && docker rm idf
+       ;;
+     "clear")
+       docker rmi idf
+       ;;
+  esac
 }
 
 yoc ()
