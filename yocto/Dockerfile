@@ -8,3 +8,5 @@ RUN apt update && apt install gawk wget git diffstat unzip \
       iputils-ping python3-git python3-jinja2 libegl1-mesa \
       libsdl1.2-dev python3-subunit mesa-common-dev zstd \
       liblz4-tool file locales libacl1 ncurses-base -y
+
+RUN locale-gen en_US.UTF-8
