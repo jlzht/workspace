@@ -9,4 +9,7 @@ RUN apt update && apt install gawk wget git diffstat unzip \
       libsdl1.2-dev python3-subunit mesa-common-dev zstd \
       liblz4-tool file locales libacl1 ncurses-base -y
 
-RUN locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+RUN sed -i -e "s/# $LANG.*/$LANG UTF-8/" /etc/locale.gen && \
+    dpkg-reconfigure --frontend=noninteractive locales && \
+    update-locale LANG=$LANG
