@@ -14,7 +14,11 @@ get_nodes () {
   fi
   local num=$(echo "$node" | grep -o '^[A-Za-z].*:' | wc -l )
   if [ "$num" -eq "1" ]; then
-    echo "$node" | cut -d : -f 2 | tr -d '"'
+    if [ "$2" == *"$1"*  ]; then
+      echo "$node" | cut -d : -f 2 | tr -d '"'
+      return
+    fi
+    echo "$node"
     return
   fi
   if [ "$num" -eq "0" ]; then
@@ -53,14 +57,14 @@ ws_exec () {
       local path=$(get_nodes "$file" path)
       local env=$(get_nodes "$file" env | sed 's/ /\-\-build-arg /')
       build="docker build $env -t $1 $path"
-      echo $build
+      eval $build
       exit 0
     ;;
     "run")
       local args=$(get_nodes "$file" args)
       local volumes=$(get_nodes "$file" volumes | sed 's/ /\-v /')
       init="docker run -d --name $1 -it $volumes $args $1"
-      echo $init
+      eval $init
       exit 0
       ;;
     "exec")
@@ -73,7 +77,7 @@ ws_exec () {
           exit 1
         fi
         run="docker exec -it $args $1 sh -c '${cmd}'"
-        echo $run
+        eval $run
         exit 0
       else
         echo "Error: $1 doesn't seem to be running"
