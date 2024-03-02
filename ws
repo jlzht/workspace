@@ -1,20 +1,28 @@
 #!/usr/bin/env bash
 
-# There is no YAML parser, just a bunch of seds
+log() {
+  echo "$1" >&2
+}
 
-get_nodes () {
+# This is a simple yaml element extractor
+extract() {
+  # Checks arguments
   if ! [ -n "$1" ] || ! [ -n "$2" ]; then
     echo ""
     return
   fi
-  local node=$(echo "$1" | sed -n "/$2:/,/^[A-Za-z].*:/{/\s/{s/\s\s//;p;}}")
-  if [ "$1" == "$node" ]; then
-    echo "$node" | sed -n "/$2/p" | cut -d : -f 2 | tr -d '"'
-    exit 0
+  # Removes comments
+  local file=$(echo "$1" | sed 's/ #.*//' | sed '/^$/d')
+  # Tries to extract $2 element
+  local node=$(echo "$file" | sed -n "/^$2:/,/^[A-Za-z].*:/{/^\s/{s/\s\s//;p;}}")
+  if [ "$node" == "" ]; then
+    node=$(echo "$file" | sed -n "/^$2:/,/^[A-Za-z].*:/{/\s/{s/\s\s//;p;}}")
   fi
+
   local num=$(echo "$node" | grep -o '^[A-Za-z].*:' | wc -l )
   if [ "$num" -eq "1" ]; then
-    if [ "$2" == *"$1"*  ]; then
+    # add case for array in one line
+    if [[ "${node}" == $2:* ]]; then
       echo "$node" | cut -d : -f 2 | tr -d '"'
       return
     fi
@@ -25,64 +33,70 @@ get_nodes () {
     echo "$node" | sed "s/\-//" | tr -d '"'
     return
   fi
+  local frag=$(echo "$node" | sed -n "/^$2/p" | cut -d : -f 2 | tr -d '"')
+  if ! [ "$frag" == "" ]; then
+    echo $frag
+    return
+  fi
   echo "$node"
 }
 
+# Get ws configuration file
 check_config() {
   if ! [ -n "$HOME/.config/workspace/config.yml" ]; then
     echo "Error: no configuration file found"
     exit 1
   else
     echo "`cat $HOME/.config/workspace/config.yml`"
-  fi   
+  fi
 }
 
-ws_exec () {
+ws() {
   local file=$(check_config)
-  file=$(get_nodes "$file" "$1")
+  file=$(extract "$file" "$1")
   if ! [ -n "$file" ]; then
     echo "Error: $1 workspace does not exist in configuration file"
     exit 1
   fi
   if [ "$2" != "stop" ]; then
-    file=$(get_nodes "$file" "$2")
+    file=$(extract "$file" "$2")
     if ! [ -n "$file" ]; then
       echo "Error: no valid ws action provided"
       exit 1
     fi
   fi
 
-  case "$2" in 
+  case "$2" in
     "build")
-      local path=$(get_nodes "$file" path)
-      local env=$(get_nodes "$file" env | sed 's/ /\-\-build-arg /')
-      build="docker build $env -t $1 $path"
-      eval $build
+      local path=$(extract "$file" path)
+      local args=$(extract "$file" args | sed 's/ /\-\-build-arg /')
+      local build="docker build $args -t $1 $path"
+      echo $build
       exit 0
     ;;
     "run")
-      local args=$(get_nodes "$file" args)
-      local volumes=$(get_nodes "$file" volumes | sed 's/ /\-v /')
-      init="docker run -d --name $1 -it $volumes $args $1"
-      eval $init
+      local env=$(extract "$file" env | sed 's/ /\-e /')
+      local volumes=$(extract "$file" volumes | sed 's/ /\-v /')
+      local run="docker run -d --name $1 -it $volumes $env $1"
+      echo $run
       exit 0
       ;;
     "exec")
       if docker ps -q --filter "name=$1" | grep -q .; then
-        local args=$(get_nodes "$file" args)
-        local cmd=$(get_nodes "$file" cmd)
-        cmd=$(get_nodes "$cmd" $3)
-        if ! [ -n "$cmd" ]; then
+        local args=$(extract "$file" args)
+        local cmd=$(extract "$file" cmd)
+        local run=$(extract "$cmd" "$3")
+        if ! [ -n "$run" ]; then
           echo "Error: no command provided or missing"
           exit 1
         fi
-        run="docker exec -it $args $1 sh -c '${cmd}'"
-        eval $run
+        local exec="docker exec -it $args $1 sh -c '${run}'"
+        echo $exec
         exit 0
       else
         echo "Error: $1 doesn't seem to be running"
         exit 1
-      fi  
+      fi
     ;;
     "stop")
       echo "Info: stopping $1 workspace!"
@@ -106,4 +120,4 @@ ws_exec () {
   exit 0
 }
 
-ws_exec "$@" 
+ws "$@"
