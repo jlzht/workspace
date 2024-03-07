@@ -19,7 +19,7 @@ extract() {
     node=$(echo "$file" | sed -n "/^$2:/,/^[A-Za-z].*:/{/\s/{s/\s\s//;p;}}")
   fi
 
-  local num=$(echo "$node" | grep -o '^[A-Za-z].*:' | wc -l )
+  local num=$(echo "$node" | grep -o '^[A-Za-z].*:' | wc -l)
   if [ "$num" -eq "1" ]; then
     # add case for array in one line
     if [[ "${node}" == $2:* ]]; then
@@ -47,7 +47,7 @@ check_config() {
     echo "Error: no configuration file found"
     exit 1
   else
-    echo "`cat $HOME/.config/workspace/config.yml`"
+    echo "$(cat $HOME/.config/workspace/config.yml)"
   fi
 }
 
@@ -67,54 +67,56 @@ ws() {
   fi
 
   case "$2" in
-    "build")
-      local path=$(extract "$file" path)
-      local args=$(extract "$file" args | sed 's/ /\-\-build-arg /')
-      local build="docker build $args -t $1 $path"
-      echo $build
+  "build")
+    local path=$(extract "$file" path)
+    local args=$(extract "$file" args | sed 's/ /\-\-build-arg /')
+    local build="docker build $args -t $1 $path"
+    eval $build
+    exit 0
+    ;;
+  "run")
+    local env=$(extract "$file" env | sed 's/ /\-e /')
+    local args=$(extract "$file" args)
+    local volumes=$(extract "$file" volumes | sed 's/ /\-v /')
+    local run="docker run -d --name $1 -it $args $volumes $env $1"
+    eval $run
+    exit 0
+    ;;
+  "exec")
+    if docker ps -q --filter "name=$1" | grep -q .; then
+      local args=$(extract "$file" args)
+      local cmd=$(extract "$file" cmd)
+      local run=$(extract "$cmd" "$3")
+      if ! [ -n "$run" ]; then
+        echo "Error: no command provided or missing"
+        exit 1
+      fi
+      local exec="docker exec -it $args $1 sh -c '${run}'"
+      eval $exec
       exit 0
-    ;;
-    "run")
-      local env=$(extract "$file" env | sed 's/ /\-e /')
-      local volumes=$(extract "$file" volumes | sed 's/ /\-v /')
-      local run="docker run -d --name $1 -it $volumes $env $1"
-      echo $run
-      exit 0
-      ;;
-    "exec")
-      if docker ps -q --filter "name=$1" | grep -q .; then
-        local args=$(extract "$file" args)
-        local cmd=$(extract "$file" cmd)
-        local run=$(extract "$cmd" "$3")
-        if ! [ -n "$run" ]; then
-          echo "Error: no command provided or missing"
-          exit 1
-        fi
-        local exec="docker exec -it $args $1 sh -c '${run}'"
-        echo $exec
-        exit 0
-      else
-        echo "Error: $1 doesn't seem to be running"
-        exit 1
-      fi
-    ;;
-    "stop")
-      echo "Info: stopping $1 workspace!"
-      if ! docker ps -q --filter "name=$1" | grep -q .; then
-        echo "Error: $1 doesn't seem to be running"
-        exit 0
-      else
-        docker stop $1 > /dev/null  && docker rm $1 > /dev/null
-        exit 1
-      fi
-    ;;
-    *)
-      if ! [ -n "$2" ]; then
-        echo "Error: no action provided"
-        exit 1
-      fi
-      echo "Error: $2 action not found in configuration file"
+    else
+      echo "Error: $1 doesn't seem to be running"
       exit 1
+    fi
+    ;;
+  "stop")
+    echo "Info: stopping $1 workspace!"
+    if ! docker ps -q --filter "name=$1" | grep -q .; then
+      echo "Error: $1 doesn't seem to be running"
+      exit 0
+    else
+      docker stop $1 >/dev/null
+      docker rm $1 >/dev/null
+      exit 1
+    fi
+    ;;
+  *)
+    if ! [ -n "$2" ]; then
+      echo "Error: no action provided"
+      exit 1
+    fi
+    echo "Error: $2 action not found in configuration file"
+    exit 1
     ;;
   esac
   exit 0
