@@ -1,19 +1,19 @@
 ### Workspace
-workspace is a simple Bash script designed to manage Docker containers for isolated development
-environments. It simplifies the process of running development tools and services inside containers.
-This is particularly useful when libraries or tools are required but not available through the host's
-package manager, in environments where installing gazillions of dependencies is cumbersome, or when dealing
-with "works on my machine" issues.
+This is a simple Bash script designed to manage Docker containers for isolated development
+environments. It simplifies the process of running development tools and services inside Docker containers.
+It is particularly useful when libraries or tools are required but not available through the host's
+package manager, or dealing with environments where installing gazillions of dependencies in host
+is cumbersome.
 
 ### Installation
 
-Make sure you have Docker and Bash installed on your system. Then, place the workspace script
-in a directory included in your $PATH, or call it directly from where you have the script saved.
+Make sure you have Docker and Bash installed on your system. Then, place the script
+in a directory included in your `$PATH`, or call it directly from where you have the script saved.
 Dont forget to add permissions
 
 ### Example
 
-Create a configuration YAML file at $HOME/.config/workspace/config.yml. This file defines the
+Create a configuration YAML file at `$HOME/.config/workspace/config.yml` This file defines the
 settings for each workspace you want to manage.
 
 ```
@@ -49,14 +49,15 @@ $ ws <workspace name> exec action1
 
 ### Workflow Example
 By sharing a project path as a volume, a compiler, linter, and formatter can be installed in
-the container and invoked using ws exec <project> <action>, to be used by host, in host
+the container and invoked using `ws exec <project> <action>`. To be used by host in its
 environment.
+
 ```
     HOST
             NEOVIM EDITOR ─────────────────────────────> FILE
                   Λ                                       Λ
                   ⎪                                       ⎪
-              (invokes)                           (Shared by volume)
+             (uses stdout)                       (Shared by volume)
                   ⎪                                       ⎪
                   ⎪                                       ⎪
     CONTAINER     ⎪                                       ⎪
